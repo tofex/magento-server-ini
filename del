@@ -1,0 +1,158 @@
+#!/usr/bin/env php
+<?php
+
+if (PHP_SAPI !== 'cli') {
+    fwrite(STDERR, 'Must be run as a CLI!' . PHP_EOL);
+    die(1);
+}
+
+if ( ! array_key_exists(1, $argv)) {
+    fwrite(STDERR, 'No ini file specified!' . PHP_EOL);
+    die(1);
+}
+
+$fileName = $argv[ 1 ];
+
+if ( ! file_exists($fileName)) {
+    fwrite(STDERR, sprintf('Invalid ini file specified: %s!', $fileName) . PHP_EOL);
+    die(1);
+}
+
+if ( ! is_readable($fileName)) {
+    fwrite(STDERR, sprintf('Unreadable ini file specified: %s!', $fileName) . PHP_EOL);
+    die(1);
+}
+
+$data = parse_ini_file($fileName, true);
+
+if ( ! array_key_exists(2, $argv)) {
+    fwrite(STDERR, 'No section specified!' . PHP_EOL);
+    die(1);
+}
+
+$section = array_key_exists(2, $argv) ? $argv[ 2 ] : null;
+
+if ( ! array_key_exists(3, $argv)) {
+    fwrite(STDERR, 'No key specified!' . PHP_EOL);
+    die(1);
+}
+
+$key = array_key_exists(3, $argv) ? $argv[ 3 ] : null;
+$value = array_key_exists(4, $argv) ? $argv[ 4 ] : null;
+
+if (array_key_exists($section, $data)) {
+    if (array_key_exists($key, $data[ $section ])) {
+        if ($value === null) {
+            unset($data[ $section ][ $key ]);
+        } else {
+            $keyValue = $data[ $section ][ $key ];
+
+            if (is_array($keyValue)) {
+                foreach ($keyValue as $keyValueKey => $keyValueValue) {
+                    if ($keyValueValue == $value) {
+                        unset($data[ $section ][ $key ][ $keyValueKey ]);
+                    }
+                }
+            } else if ($keyValue == $value) {
+                unset($data[ $section ][ $key ]);
+            }
+        }
+    }
+}
+
+$fileHandle = fopen($fileName, 'w');
+
+$hasSimpleValues = false;
+
+foreach ($data as $key => $value) {
+    if (is_array($value)) {
+        if (empty($value)) {
+            unset($data[ $key ]);
+        } else {
+            $isAssociative = false;
+
+            for ($iterator = count($value) - 1; $iterator; $iterator--) {
+                if ( ! array_key_exists($iterator, $value)) {
+                    $isAssociative = true;
+                    break;
+                }
+            }
+
+            if ( ! $isAssociative) {
+                $isAssociative = ! array_key_exists(0, $value);
+            }
+
+            if ( ! $isAssociative) {
+                if (count($value) === 1) {
+                    fwrite($fileHandle, sprintf("%s = %s\n", $key, reset($value)));
+                } else {
+                    foreach ($value as $valueValue) {
+                        if (is_numeric($valueValue)) {
+                            fwrite($fileHandle, sprintf("%s[] = %s\n", $key, $valueValue));
+                        } else {
+                            fwrite($fileHandle, sprintf("%s[] = \"%s\"\n", $key, $valueValue));
+                        }
+                    }
+                }
+
+                unset($data[ $key ]);
+
+                $hasSimpleValues = true;
+            }
+        }
+    } else {
+        if (is_numeric($value)) {
+            fwrite($fileHandle, sprintf("%s = %s\n", $key, $value));
+        } else {
+            fwrite($fileHandle, sprintf("%s = \"%s\"\n", $key, $value));
+        }
+
+        unset($data[ $key ]);
+
+        $hasSimpleValues = true;
+    }
+}
+
+if ($hasSimpleValues) {
+    fwrite($fileHandle, "\n");
+}
+
+$isFirstSection = true;
+
+foreach ($data as $key => $value) {
+    if (is_array($value)) {
+        if ($hasSimpleValues || ! $isFirstSection) {
+            fwrite($fileHandle, "\n");
+        }
+
+        fwrite($fileHandle, sprintf("[%s]\n", $key));
+
+        foreach ($value as $valueKey => $valueValue) {
+            if (is_array($valueValue)) {
+                if (count($valueValue) === 1) {
+                    fwrite($fileHandle, sprintf("%s = %s\n", $valueKey, reset($valueValue)));
+                } else {
+                    foreach ($valueValue as $valueValueValue) {
+                        if (is_numeric($valueValueValue)) {
+                            fwrite($fileHandle, sprintf("%s[] = %s\n", $valueKey, $valueValueValue));
+                        } else {
+                            fwrite($fileHandle, sprintf("%s[] = \"%s\"\n", $valueKey, $valueValueValue));
+                        }
+                    }
+                }
+            } else {
+                if (is_numeric($valueValue)) {
+                    fwrite($fileHandle, sprintf("%s = %s\n", $valueKey, $valueValue));
+                } else {
+                    fwrite($fileHandle, sprintf("%s = \"%s\"\n", $valueKey, $valueValue));
+                }
+            }
+        }
+    }
+
+    $isFirstSection = false;
+}
+
+fclose($fileHandle);
+
+die(0);

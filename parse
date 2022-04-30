@@ -1,0 +1,81 @@
+#!/usr/bin/env php
+<?php
+
+if (PHP_SAPI !== 'cli') {
+    fwrite(STDERR, 'Must be run as a CLI!' . PHP_EOL);
+    die(1);
+}
+
+if ( ! array_key_exists(1, $argv)) {
+    fwrite(STDERR, 'No ini file specified!' . PHP_EOL);
+    die(1);
+}
+
+$fileName = $argv[ 1 ];
+
+if ( ! file_exists($fileName)) {
+    fwrite(STDERR, sprintf('Invalid ini file specified: %s!', $fileName) . PHP_EOL);
+    die(1);
+}
+
+if ( ! is_readable($fileName)) {
+    fwrite(STDERR, sprintf('Unreadable ini file specified: %s!', $fileName) . PHP_EOL);
+    die(1);
+}
+
+$data = parse_ini_file($fileName, true);
+
+if ( ! array_key_exists(2, $argv)) {
+    fwrite(STDERR, 'No requirement specified!' . PHP_EOL);
+    die(1);
+}
+
+$required = filter_var($argv[ 2 ], FILTER_VALIDATE_BOOLEAN);
+$section = array_key_exists(3, $argv) ? $argv[ 3 ] : null;
+$key = array_key_exists(4, $argv) ? $argv[ 4 ] : null;
+
+if ( ! empty($section)) {
+    if ( ! array_key_exists($section, $data)) {
+        if ($required) {
+            if ( ! empty($key)) {
+                fwrite(STDERR, sprintf('Invalid section specified: %s', $section) . PHP_EOL);
+            } else {
+                fwrite(STDERR, sprintf('Invalid file specified: %s', $section) . PHP_EOL);
+            }
+            die(1);
+        } else {
+            return;
+        }
+    }
+
+    $data = $data[ $section ];
+}
+
+if ( ! empty($key)) {
+    if ( ! array_key_exists($key, $data)) {
+        if ($required) {
+            fwrite(STDERR, sprintf('Invalid key specified: %s', $key) . PHP_EOL);
+            die(1);
+        } else {
+            return;
+        }
+    }
+
+    $data = $data[ $key ];
+}
+
+if (is_array($data)) {
+    if (empty($key)) {
+        foreach (array_keys($data) as $key) {
+            echo $key . "\n";
+        }
+    } else {
+        foreach (array_values($data) as $value) {
+            echo $value . "\n";
+        }
+    }
+} else {
+    echo (is_scalar($data) ? $data : var_export($data)) . "\n";
+}
+
+die(0);
