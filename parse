@@ -54,7 +54,7 @@ if ( ! empty($section)) {
 if ( ! empty($key)) {
     if ( ! array_key_exists($key, $data)) {
         if ($required) {
-            fwrite(STDERR, sprintf('Invalid key specified: %s', $key) . PHP_EOL);
+            fwrite(STDERR, sprintf('Invalid key specified: %s[%s]', $section, $key) . PHP_EOL);
             die(1);
         } else {
             return;
